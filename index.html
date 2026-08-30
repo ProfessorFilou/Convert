@@ -211,10 +211,18 @@ const RESOLUTIONS = [
   {value:"480", label:"480p"}
 ];
 const BITRATES = [
-  {value:"320k", label:"320 kbps (hoch)"},
+  {value:"320k", label:"320 kbps (CD Baby MP3)"},
   {value:"192k", label:"192 kbps (Standard)"},
   {value:"128k", label:"128 kbps"},
   {value:"96k", label:"96 kbps (klein)"}
+];
+const SAMPLE_RATES = [
+  {value:"44100", label:"44,1 kHz (CD Baby)"},
+  {value:"48000", label:"48 kHz"}
+];
+const CHANNELS = [
+  {value:"2", label:"Stereo (CD Baby)"},
+  {value:"1", label:"Mono"}
 ];
 
 /* ---------- helpers ---------- */
@@ -269,7 +277,9 @@ function makeItem(file) {
     suggested,
     quality: type === "image" ? 92 : 28,
     resolution: "original",
-    bitrate: "192k",
+    bitrate: "320k",
+    sampleRate: "44100",
+    channels: "2",
     resizeMax: "original",
     trimStart: "", trimEnd: "",
     advancedOpen: false,
@@ -355,7 +365,18 @@ function advancedPanel(item) {
           ${BITRATES.map(b => `<option value="${b.value}" ${item.bitrate===b.value?"selected":""}>${b.label}</option>`).join("")}
         </select>
       </div>
-      <div></div>
+      <div>
+        <label class="text-xs text-mist mb-1.5 block">Kanäle</label>
+        <select data-role="channels" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog">
+          ${CHANNELS.map(c => `<option value="${c.value}" ${item.channels===c.value?"selected":""}>${c.label}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-mist mb-1.5 block">Sample-Rate</label>
+        <select data-role="sampleRate" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog">
+          ${SAMPLE_RATES.map(r => `<option value="${r.value}" ${item.sampleRate===r.value?"selected":""}>${r.label}</option>`).join("")}
+        </select>
+      </div>
       <div>
         <label class="text-xs text-mist mb-1.5 block">Start (mm:ss, optional)</label>
         <input type="text" placeholder="00:00" value="${escapeHtml(item.trimStart)}" data-role="trimStart" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog placeholder-mist/50" />
@@ -503,6 +524,12 @@ function attachCardListeners() {
   fileListEl.querySelectorAll('[data-role="bitrate"]').forEach(el => el.addEventListener("change", e => {
     findItem(e.target.dataset.id).bitrate = e.target.value; renderAll();
   }));
+  fileListEl.querySelectorAll('[data-role="sampleRate"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).sampleRate = e.target.value; renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="channels"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).channels = e.target.value; renderAll();
+  }));
   fileListEl.querySelectorAll('[data-role="resize"]').forEach(el => el.addEventListener("change", e => {
     findItem(e.target.dataset.id).resizeMax = e.target.value; renderAll();
   }));
@@ -626,12 +653,14 @@ function buildFFmpegArgs(item, input, output, sizeMB) {
     return args;
   }
 
-  const bitrate = item.bitrate || "192k";
-  if (format === "mp3") args.push("-vn", "-acodec", "libmp3lame", "-b:a", bitrate, "-ar", "44100", "-ac", "2", "-y", output);
-  else if (format === "wav") args.push("-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-y", output);
+  const bitrate = item.bitrate || "320k";
+  const sampleRate = item.sampleRate || "44100";
+  const channels = item.channels || "2";
+  if (format === "mp3") args.push("-vn", "-acodec", "libmp3lame", "-b:a", bitrate, "-ar", sampleRate, "-ac", channels, "-y", output);
+  else if (format === "wav") args.push("-vn", "-acodec", "pcm_s16le", "-ar", sampleRate, "-ac", channels, "-y", output);
   else if (format === "ogg") args.push("-vn", "-acodec", "libvorbis", "-b:a", bitrate, "-y", output);
   else if (format === "flac") args.push("-vn", "-acodec", "flac", "-y", output);
-  else if (format === "aac" || format === "m4a") args.push("-vn", "-acodec", "aac", "-b:a", bitrate, "-ar", "44100", "-ac", "2", "-y", output);
+  else if (format === "aac" || format === "m4a") args.push("-vn", "-acodec", "aac", "-b:a", bitrate, "-ar", sampleRate, "-ac", channels, "-y", output);
   else args.push("-vn", "-y", output);
   return args;
 }
@@ -702,7 +731,7 @@ async function convertOne(item) {
       } catch (e) {
         if (item.targetFormat === "mp3") {
           setProgress(item, 15, "Zweiter Versuch (einfacher)…");
-          await local.exec(["-i", inputName, "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-y", outputName]);
+          await local.exec(["-i", inputName, "-vn", "-acodec", "libmp3lame", "-b:a", item.bitrate || "320k", "-ar", item.sampleRate || "44100", "-ac", item.channels || "2", "-y", outputName]);
         } else {
           throw e;
         }
