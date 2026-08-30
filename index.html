@@ -336,7 +336,7 @@
           progressText.textContent = 'Konvertiere…';
         });
 
-        // Alles als Blob-URL → kein CORS-Problem mit Worker
+        // Blob-URLs = kein CORS-Problem mit Worker
         const ffmpegBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
         const coreBase   = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
 
@@ -385,7 +385,19 @@
 
         const args = buildFFmpegArgs(inputName, outputName, format, file.type || file.name);
         console.log('FFmpeg args:', args);
-        await ffmpeg.exec(args);
+
+        try {
+          await ffmpeg.exec(args);
+        } catch (execErr) {
+          // Fallback für schwierige WAV-Dateien
+          console.warn('Erster Versuch fehlgeschlagen, versuche einfachen Befehl…', execErr);
+          progressText.textContent = 'Zweiter Versuch…';
+          if (format === 'mp3') {
+            await ffmpeg.exec(['-i', inputName, '-vn', '-acodec', 'libmp3lame', '-b:a', '192k', '-y', outputName]);
+          } else {
+            throw execErr;
+          }
+        }
 
         progressText.textContent = 'Fertig!';
         progressBar.style.width = '100%';
@@ -453,20 +465,29 @@
         return ['-i', input, '-y', output];
       }
 
+      // Robuste Audio-Parameter (besonders für WAV → MP3)
       if (format === 'mp3') {
-        return ['-i', input, '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-y', output];
+        return [
+          '-i', input,
+          '-vn',
+          '-acodec', 'libmp3lame',
+          '-b:a', '192k',
+          '-ar', '44100',
+          '-ac', '2',
+          '-y', output
+        ];
       }
       if (format === 'wav') {
-        return ['-i', input, '-vn', '-c:a', 'pcm_s16le', '-y', output];
+        return ['-i', input, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', '-y', output];
       }
       if (format === 'ogg') {
-        return ['-i', input, '-vn', '-c:a', 'libvorbis', '-q:a', '4', '-y', output];
+        return ['-i', input, '-vn', '-acodec', 'libvorbis', '-q:a', '4', '-y', output];
       }
       if (format === 'flac') {
-        return ['-i', input, '-vn', '-c:a', 'flac', '-y', output];
+        return ['-i', input, '-vn', '-acodec', 'flac', '-y', output];
       }
       if (format === 'aac' || format === 'm4a') {
-        return ['-i', input, '-vn', '-c:a', 'aac', '-b:a', '192k', '-y', output];
+        return ['-i', input, '-vn', '-acodec', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', '-y', output];
       }
       return ['-i', input, '-vn', '-y', output];
     }
