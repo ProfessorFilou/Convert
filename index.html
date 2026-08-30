@@ -341,18 +341,23 @@ async function convertImage(file, format) {
   });
 }
 
-function buildFFmpegArgs(input, output, format) {
+function buildFFmpegArgs(input, output, format, sizeMB) {
+  sizeMB = sizeMB || 0;
   const isVideoOut = ["mp4","webm","avi","mov","mkv"].includes(format);
+  // Bei großen Dateien: niedrigere Bitrate + ultrafast
+  const audioBitrate = sizeMB > 80 ? "128k" : "192k";
+  const videoCrf = sizeMB > 100 ? "32" : "28";
+
   if (isVideoOut) {
-    if (format === "mp4") return ["-i", input, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", output];
-    if (format === "webm") return ["-i", input, "-c:v", "libvpx", "-b:v", "1M", "-c:a", "libvorbis", "-y", output];
+    if (format === "mp4") return ["-i", input, "-c:v", "libx264", "-preset", "ultrafast", "-crf", videoCrf, "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", output];
+    if (format === "webm") return ["-i", input, "-c:v", "libvpx", "-b:v", sizeMB > 80 ? "500k" : "1M", "-c:a", "libvorbis", "-y", output];
     return ["-i", input, "-y", output];
   }
-  if (format === "mp3") return ["-i", input, "-vn", "-acodec", "libmp3lame", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-y", output];
+  if (format === "mp3") return ["-i", input, "-vn", "-acodec", "libmp3lame", "-b:a", audioBitrate, "-ar", "44100", "-ac", "2", "-y", output];
   if (format === "wav") return ["-i", input, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-y", output];
   if (format === "ogg") return ["-i", input, "-vn", "-acodec", "libvorbis", "-q:a", "4", "-y", output];
   if (format === "flac") return ["-i", input, "-vn", "-acodec", "flac", "-y", output];
-  if (format === "aac" || format === "m4a") return ["-i", input, "-vn", "-acodec", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-y", output];
+  if (format === "aac" || format === "m4a") return ["-i", input, "-vn", "-acodec", "aac", "-b:a", audioBitrate, "-ar", "44100", "-ac", "2", "-y", output];
   return ["-i", input, "-vn", "-y", output];
 }
 
@@ -367,6 +372,18 @@ function getMime(format) {
 
 convertBtn.addEventListener("click", async () => {
   if (!selectedFiles.length) return;
+
+  const file = selectedFiles[0];
+  const sizeMB = file.size / (1024 * 1024);
+
+  // Warnung bei großen Dateien
+  if (sizeMB > 200) {
+    const ok = confirm("Die Datei ist " + sizeMB.toFixed(0) + " MB groß.\n\nIm Browser kann das bei sehr großen Dateien lange dauern oder der Speicher nicht reichen.\n\nTrotzdem fortfahren?");
+    if (!ok) return;
+  } else if (sizeMB > 80) {
+    progressText.textContent = "Große Datei – bitte Geduld…";
+  }
+
   convertBtn.disabled = true;
   convertBtn.textContent = "Bitte warten…";
   resultSection.classList.add("hidden");
@@ -375,7 +392,6 @@ convertBtn.addEventListener("click", async () => {
   progressPercent.textContent = "0%";
 
   try {
-    const file = selectedFiles[0];
     const format = targetFormat.value;
     const type = detectType(file);
     let blob, newName;
@@ -392,26 +408,32 @@ convertBtn.addEventListener("click", async () => {
       await loadFFmpeg();
       const inputName = "input" + (getExt(file.name) ? "." + getExt(file.name) : "");
       const outputName = "output." + format;
-      progressText.textContent = "Datei wird gelesen…";
-      progressBar.style.width = "15%";
+      progressText.textContent = "Datei wird gelesen (" + sizeMB.toFixed(1) + " MB)…";
+      progressBar.style.width = "10%";
       await ffmpeg.writeFile(inputName, await fetchFile(file));
-      progressText.textContent = "Konvertiere…";
-      progressBar.style.width = "25%";
-      const args = buildFFmpegArgs(inputName, outputName, format);
+      progressText.textContent = sizeMB > 50 ? "Konvertiere große Datei – bitte warten…" : "Konvertiere…";
+      progressBar.style.width = "20%";
+
+      // Bei großen Dateien schnellere / speicherschonendere Settings
+      const args = buildFFmpegArgs(inputName, outputName, format, sizeMB);
       try {
         await ffmpeg.exec(args);
       } catch (e) {
         if (format === "mp3") {
-          progressText.textContent = "Zweiter Versuch…";
-          await ffmpeg.exec(["-i", inputName, "-vn", "-acodec", "libmp3lame", "-b:a", "192k", "-y", outputName]);
-        } else throw e;
+          progressText.textContent = "Zweiter Versuch (einfacher)…";
+          await ffmpeg.exec(["-i", inputName, "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-y", outputName]);
+        } else {
+          throw e;
+        }
       }
-      progressBar.style.width = "100%";
-      progressPercent.textContent = "100%";
+      progressBar.style.width = "90%";
+      progressPercent.textContent = "90%";
       const data = await ffmpeg.readFile(outputName);
       blob = new Blob([data.buffer], { type: getMime(format) });
       newName = file.name.replace(/\.[^/.]+$/, "") + "." + format;
       try { await ffmpeg.deleteFile(inputName); await ffmpeg.deleteFile(outputName); } catch (_) {}
+      progressBar.style.width = "100%";
+      progressPercent.textContent = "100%";
     }
 
     const url = URL.createObjectURL(blob);
@@ -422,7 +444,11 @@ convertBtn.addEventListener("click", async () => {
     progressSection.classList.add("hidden");
   } catch (err) {
     console.error(err);
-    alert("Fehler bei der Konvertierung:\n\n" + (err.message || err) + "\n\nTipp: Versuche eine kleinere Datei oder ein anderes Format.");
+    let msg = err.message || String(err);
+    if (msg.includes("memory") || msg.includes("Memory") || msg.includes("OOM") || msg.includes("allocation")) {
+      msg = "Zu wenig Speicher im Browser.\n\nTipp: Kleinere Datei nehmen oder Tab neu laden und nochmal versuchen.";
+    }
+    alert("Fehler bei der Konvertierung:\n\n" + msg);
     progressSection.classList.add("hidden");
   } finally {
     convertBtn.disabled = false;
