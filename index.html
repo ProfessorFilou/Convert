@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Convert — ProfessorFilou</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2322D3EE'/%3E%3Cstop offset='1' stop-color='%23A78BFA'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='%230B0D12'/%3E%3Cpath d='M9 16l4 4 10-10' stroke='url(%23g)' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: '#0B0D12',
+          panel: '#12151D',
+          panel2: '#171B26',
+          edge: '#242938',
+          mist: '#8B93A7',
+          fog: '#D6DAE5',
+          cyan: { DEFAULT: '#22D3EE', dim: '#0E7490' },
+          violet: { DEFAULT: '#A78BFA', dim: '#6D28D9' },
+          mint: '#34D399',
+          rose: '#FB7185',
+          amber: '#FBBF24'
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"', 'sans-serif'],
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body{ background:#0B0D12; }
+  .orb{ position:fixed; border-radius:9999px; filter:blur(90px); opacity:.28; pointer-events:none; z-index:0; }
+  .orb-a{ width:520px; height:520px; top:-160px; left:-140px; background:radial-gradient(circle,#22D3EE,transparent 70%); animation:drift1 26s ease-in-out infinite; }
+  .orb-b{ width:460px; height:460px; bottom:-180px; right:-120px; background:radial-gradient(circle,#A78BFA,transparent 70%); animation:drift2 32s ease-in-out infinite; }
+  @keyframes drift1{ 0%,100%{ transform:translate(0,0) } 50%{ transform:translate(60px,40px) } }
+  @keyframes drift2{ 0%,100%{ transform:translate(0,0) } 50%{ transform:translate(-50px,-30px) } }
+  .glass{ background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(16px); }
+  .grad-text{ background:linear-gradient(90deg,#22D3EE,#A78BFA); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .grad-chip{ background:linear-gradient(90deg,#22D3EE,#A78BFA); color:#0B0D12; }
+  .grad-chip:hover{ filter:brightness(1.08); }
+  .grad-ring{ background:linear-gradient(90deg,#22D3EE,#A78BFA); }
+  .drop-zone{ transition:all .25s ease; }
+  .drop-zone.dragover{ border-color:#22D3EE; background:rgba(34,211,238,.06); transform:scale(1.005); }
+  .fade-in{ animation:fadeIn .35s ease both; }
+  @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px) } to{ opacity:1; transform:translateY(0) } }
+  .progress-fill{ transition:width .25s ease; }
+  .arrow-flow{ background:linear-gradient(90deg,#22D3EE,#A78BFA); background-size:200% 100%; }
+  .arrow-flow.pulsing{ animation:flow 1.4s linear infinite; }
+  @keyframes flow{ from{ background-position:0% 0 } to{ background-position:-200% 0 } }
+  select, input[type=text]{ color-scheme: dark; }
+  .thumb-wrap video, .thumb-wrap img{ object-fit:cover; }
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:#242938; border-radius:8px; }
+  .toggle-chevron{ transition:transform .2s ease; }
+  .advanced-open .toggle-chevron{ transform:rotate(180deg); }
+  .badge{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em; }
+</style>
+</head>
+<body class="text-fog min-h-screen relative">
+<div class="orb orb-a"></div>
+<div class="orb orb-b"></div>
+
+<header class="relative z-10 border-b border-edge/70">
+  <div class="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg grad-ring flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M9 5l7 7-7 7"/></svg>
+      </div>
+      <span class="font-display font-semibold text-lg tracking-tight text-fog">Convert</span>
+    </div>
+    <div class="badge text-mist hidden sm:flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-mint"></span> LOKAL &middot; KEIN UPLOAD
+    </div>
+  </div>
+</header>
+
+<main class="relative z-10 max-w-5xl mx-auto px-5 py-12 sm:py-16">
+  <div class="text-center mb-10 fade-in">
+    <h1 class="font-display text-4xl sm:text-5xl font-semibold tracking-tight mb-3 text-fog">
+      Jede Datei, <span class="grad-text">jedes Format</span>
+    </h1>
+    <p class="text-mist text-lg max-w-xl mx-auto">Audio, Video und Bilder direkt im Browser konvertieren — mit Vorschau, Zuschnitt und Qualitätskontrolle. Nichts verlässt dein Gerät.</p>
+  </div>
+
+  <!-- Drop zone -->
+  <div id="dropZone" class="drop-zone glass rounded-2xl p-10 sm:p-14 text-center cursor-pointer border-2 border-dashed border-edge fade-in">
+    <input type="file" id="fileInput" accept="audio/*,video/*,image/*" class="hidden" multiple />
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-14 h-14 rounded-full grad-ring/20 flex items-center justify-center" style="background:rgba(34,211,238,.1)">
+        <svg class="w-7 h-7 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+      </div>
+      <div>
+        <p class="text-lg font-medium text-fog">Dateien hier ablegen</p>
+        <p class="text-sm text-mist mt-1">oder <span class="text-cyan font-medium underline underline-offset-2">Dateien auswählen</span> — beliebig viele auf einmal</p>
+      </div>
+      <p class="badge text-mist">AUDIO &middot; VIDEO &middot; BILDER</p>
+    </div>
+  </div>
+
+  <!-- Batch bar -->
+  <div id="batchBar" class="hidden mt-4 glass rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 fade-in">
+    <div class="text-sm text-mist">
+      <span id="batchCount" class="text-fog font-medium">0 Dateien</span> &middot; <span id="batchSize"></span>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="clearAllBtn" class="text-sm text-mist hover:text-rose px-3 py-2 rounded-lg transition-colors">Alle entfernen</button>
+      <button id="zipAllBtn" class="hidden text-sm font-medium px-4 py-2 rounded-lg border border-edge text-fog hover:border-mint hover:text-mint transition-colors">Als ZIP herunterladen</button>
+      <button id="convertAllBtn" class="text-sm font-semibold grad-chip px-5 py-2 rounded-lg transition-all">Alle konvertieren</button>
+    </div>
+  </div>
+
+  <!-- File cards -->
+  <div id="fileList" class="mt-4 space-y-3"></div>
+
+  <!-- Feature grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-16">
+    <div class="glass rounded-xl p-6">
+      <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style="background:rgba(34,211,238,.1)">
+        <svg class="w-5 h-5 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <h3 class="font-display font-semibold text-fog mb-1">100&nbsp;% privat</h3>
+      <p class="text-sm text-mist">Konvertierung läuft komplett im Browser. Kein Server, kein Upload.</p>
+    </div>
+    <div class="glass rounded-xl p-6">
+      <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style="background:rgba(167,139,250,.1)">
+        <svg class="w-5 h-5 text-violet" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4"/></svg>
+      </div>
+      <h3 class="font-display font-semibold text-fog mb-1">Zuschnitt & Qualität</h3>
+      <p class="text-sm text-mist">Start/Ende festlegen, Auflösung, Bitrate oder Bildqualität pro Datei anpassen.</p>
+    </div>
+    <div class="glass rounded-xl p-6">
+      <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style="background:rgba(52,211,153,.1)">
+        <svg class="w-5 h-5 text-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-6 4h6m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <h3 class="font-display font-semibold text-fog mb-1">Vorschau vorher/nachher</h3>
+      <p class="text-sm text-mist">Original und Ergebnis direkt anschauen und vergleichen, bevor du herunterlädst.</p>
+    </div>
+  </div>
+
+  <div class="mt-6 glass rounded-2xl p-6 sm:p-8">
+    <h2 class="font-display font-semibold text-fog mb-4">Unterstützte Formate</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+      <div><h3 class="font-medium text-cyan mb-2">Audio</h3><p class="text-mist">MP3 &middot; WAV &middot; OGG &middot; FLAC &middot; AAC &middot; M4A</p></div>
+      <div><h3 class="font-medium text-cyan mb-2">Video</h3><p class="text-mist">MP4 &middot; WebM &middot; AVI &middot; MOV &middot; MKV &middot; + Audio-Extraktion</p></div>
+      <div><h3 class="font-medium text-cyan mb-2">Bilder</h3><p class="text-mist">JPG &middot; PNG &middot; WebP &middot; GIF &middot; BMP</p></div>
+    </div>
+    <p class="badge text-mist mt-4">AUDIO/VIDEO ÜBER FFMPEG.WASM &middot; BILDER ÜBER CANVAS</p>
+  </div>
+</main>
+
+<footer class="relative z-10 border-t border-edge/70 mt-16 py-8 text-center text-sm text-mist">
+  <p>Convert &middot; von ProfessorFilou &middot; Dateien bleiben privat</p>
+</footer>
+
+<script type="module">
+import { FFmpeg } from "./ffmpeg-index.js";
+import { fetchFile, toBlobURL } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js";
+
+/* ---------- DOM refs ---------- */
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const fileListEl = document.getElementById("fileList");
+const batchBar = document.getElementById("batchBar");
+const batchCount = document.getElementById("batchCount");
+const batchSize = document.getElementById("batchSize");
+const clearAllBtn = document.getElementById("clearAllBtn");
+const convertAllBtn = document.getElementById("convertAllBtn");
+const zipAllBtn = document.getElementById("zipAllBtn");
+
+/* ---------- state ---------- */
+let items = [];
+let ffmpeg = null;
+let ffmpegLoaded = false;
+let ffmpegLoading = null;
+
+const SUGGESTIONS = {
+  wav:"mp3", flac:"mp3", aiff:"mp3", aac:"mp3", m4a:"mp3", ogg:"mp3", wma:"mp3", mp3:"wav",
+  mp4:"mp3", mov:"mp4", avi:"mp4", mkv:"mp4", webm:"mp4", flv:"mp4", "3gp":"mp4", mpeg:"mp4", mpg:"mp4",
+  png:"jpg", jpg:"png", jpeg:"png", webp:"jpg", gif:"png", bmp:"jpg", tiff:"jpg", heic:"jpg"
+};
+
+const FORMAT_OPTIONS = {
+  audio: [
+    {value:"mp3",label:"MP3"},{value:"wav",label:"WAV"},{value:"ogg",label:"OGG"},
+    {value:"flac",label:"FLAC"},{value:"aac",label:"AAC"},{value:"m4a",label:"M4A"}
+  ],
+  video: [
+    {value:"mp4",label:"MP4"},{value:"webm",label:"WebM"},{value:"avi",label:"AVI"},
+    {value:"mov",label:"MOV"},{value:"mkv",label:"MKV"},
+    {value:"mp3",label:"MP3 (nur Audio)"},{value:"wav",label:"WAV (nur Audio)"}
+  ],
+  image: [
+    {value:"jpg",label:"JPG"},{value:"png",label:"PNG"},{value:"webp",label:"WebP"},
+    {value:"gif",label:"GIF"},{value:"bmp",label:"BMP"}
+  ]
+};
+
+const RESOLUTIONS = [
+  {value:"original", label:"Original"},
+  {value:"1080", label:"1080p"},
+  {value:"720", label:"720p"},
+  {value:"480", label:"480p"}
+];
+const BITRATES = [
+  {value:"320k", label:"320 kbps (hoch)"},
+  {value:"192k", label:"192 kbps (Standard)"},
+  {value:"128k", label:"128 kbps"},
+  {value:"96k", label:"96 kbps (klein)"}
+];
+
+/* ---------- helpers ---------- */
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+function detectType(file) {
+  if (file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|tiff?|heic)$/i.test(file.name)) return "image";
+  if (file.type.startsWith("video/") || /\.(mp4|webm|avi|mov|mkv|flv|3gp|mpeg|mpg)$/i.test(file.name)) return "video";
+  if (file.type.startsWith("audio/") || /\.(mp3|wav|ogg|flac|aac|m4a|wma|aiff)$/i.test(file.name)) return "audio";
+  return null;
+}
+function getExt(name) { const m = name.match(/\.([^.]+)$/); return m ? m[1].toLowerCase() : ""; }
+function escapeHtml(text) { const d = document.createElement("div"); d.textContent = text; return d.innerHTML; }
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + " KB";
+  return (bytes/(1024*1024)).toFixed(1) + " MB";
+}
+function parseTimeToSeconds(str) {
+  if (!str || !str.trim()) return null;
+  const parts = str.trim().split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0]*60 + parts[1];
+  if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+  return null;
+}
+function getMime(format) {
+  const map = {
+    mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", flac:"audio/flac", aac:"audio/aac", m4a:"audio/mp4",
+    mp4:"video/mp4", webm:"video/webm", avi:"video/x-msvideo", mov:"video/quicktime", mkv:"video/x-matroska",
+    jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", gif:"image/gif", bmp:"image/bmp"
+  };
+  return map[format] || "application/octet-stream";
+}
+function typeIconPath(type) {
+  if (type === "image") return "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z";
+  if (type === "video") return "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z";
+  return "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3";
+}
+
+/* ---------- item factory ---------- */
+function makeItem(file) {
+  const type = detectType(file);
+  if (!type) return null;
+  const ext = getExt(file.name);
+  const suggested = SUGGESTIONS[ext] || (type === "image" ? "jpg" : type === "audio" ? "mp3" : "mp4");
+  return {
+    id: uid(),
+    file, type, ext,
+    targetFormat: suggested,
+    suggested,
+    quality: type === "image" ? 92 : 28,
+    resolution: "original",
+    bitrate: "192k",
+    resizeMax: "original",
+    trimStart: "", trimEnd: "",
+    advancedOpen: false,
+    status: "idle", // idle | converting | done | error
+    progress: 0,
+    progressText: "",
+    previewURL: URL.createObjectURL(file),
+    resultBlob: null, resultURL: null, resultName: null,
+    errorMsg: null
+  };
+}
+
+/* ---------- rendering ---------- */
+function renderBatchBar() {
+  if (!items.length) { batchBar.classList.add("hidden"); return; }
+  batchBar.classList.remove("hidden");
+  batchCount.textContent = items.length + (items.length === 1 ? " Datei" : " Dateien");
+  const totalSize = items.reduce((s,i) => s + i.file.size, 0);
+  batchSize.textContent = formatSize(totalSize);
+  const doneCount = items.filter(i => i.status === "done").length;
+  zipAllBtn.classList.toggle("hidden", doneCount < 2);
+  convertAllBtn.disabled = items.every(i => i.status === "converting");
+  convertAllBtn.textContent = items.some(i => i.status === "converting") ? "Läuft…" : "Alle konvertieren";
+}
+
+function previewNode(url, type, small) {
+  const h = small ? "h-24" : "h-24";
+  if (type === "image") return `<img src="${url}" class="${h} w-24 rounded-lg object-cover border border-edge" />`;
+  if (type === "video") return `<video src="${url}" class="${h} w-24 rounded-lg border border-edge bg-black" controls preload="metadata" muted></video>`;
+  return `<audio src="${url}" class="w-56" controls preload="metadata"></audio>`;
+}
+
+function advancedPanel(item) {
+  if (item.type === "image") {
+    const showQuality = ["jpg","jpeg","webp"].includes(item.targetFormat);
+    return `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        ${showQuality ? `
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Qualität <span class="text-fog font-medium">${item.quality}%</span></label>
+          <input type="range" min="40" max="100" value="${item.quality}" data-role="quality" data-id="${item.id}" class="w-full accent-cyan" />
+        </div>` : `<div></div>`}
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Maximale Breite</label>
+          <select data-role="resize" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog">
+            <option value="original" ${item.resizeMax==="original"?"selected":""}>Original</option>
+            <option value="1920" ${item.resizeMax==="1920"?"selected":""}>1920px</option>
+            <option value="1280" ${item.resizeMax==="1280"?"selected":""}>1280px</option>
+            <option value="800" ${item.resizeMax==="800"?"selected":""}>800px</option>
+          </select>
+        </div>
+      </div>`;
+  }
+  if (item.type === "video") {
+    return `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Auflösung</label>
+          <select data-role="resolution" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog">
+            ${RESOLUTIONS.map(r => `<option value="${r.value}" ${item.resolution===r.value?"selected":""}>${r.label}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Qualität <span class="text-fog font-medium">${qualityLabel(item.quality)}</span></label>
+          <input type="range" min="18" max="36" value="${item.quality}" data-role="quality" data-id="${item.id}" class="w-full accent-cyan" />
+        </div>
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Start (mm:ss, optional)</label>
+          <input type="text" placeholder="00:00" value="${escapeHtml(item.trimStart)}" data-role="trimStart" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog placeholder-mist/50" />
+        </div>
+        <div>
+          <label class="text-xs text-mist mb-1.5 block">Ende (mm:ss, optional)</label>
+          <input type="text" placeholder="z. B. 01:30" value="${escapeHtml(item.trimEnd)}" data-role="trimEnd" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog placeholder-mist/50" />
+        </div>
+      </div>`;
+  }
+  // audio
+  return `
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="text-xs text-mist mb-1.5 block">Bitrate</label>
+        <select data-role="bitrate" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog">
+          ${BITRATES.map(b => `<option value="${b.value}" ${item.bitrate===b.value?"selected":""}>${b.label}</option>`).join("")}
+        </select>
+      </div>
+      <div></div>
+      <div>
+        <label class="text-xs text-mist mb-1.5 block">Start (mm:ss, optional)</label>
+        <input type="text" placeholder="00:00" value="${escapeHtml(item.trimStart)}" data-role="trimStart" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog placeholder-mist/50" />
+      </div>
+      <div>
+        <label class="text-xs text-mist mb-1.5 block">Ende (mm:ss, optional)</label>
+        <input type="text" placeholder="z. B. 01:30" value="${escapeHtml(item.trimEnd)}" data-role="trimEnd" data-id="${item.id}" class="w-full bg-panel2 border border-edge rounded-lg px-3 py-2 text-sm text-fog placeholder-mist/50" />
+      </div>
+    </div>`;
+}
+function qualityLabel(crf) {
+  if (crf <= 22) return "Hoch";
+  if (crf <= 28) return "Mittel";
+  return "Klein";
+}
+
+function renderCard(item) {
+  const typeColor = item.type === "image" ? "text-violet" : item.type === "video" ? "text-cyan" : "text-mint";
+  const typeBg = item.type === "image" ? "rgba(167,139,250,.12)" : item.type === "video" ? "rgba(34,211,238,.12)" : "rgba(52,211,153,.12)";
+  const options = FORMAT_OPTIONS[item.type] || [];
+
+  const optionsHtml = options.map(o =>
+    `<option value="${o.value}" ${o.value===item.targetFormat?"selected":""}>${o.label}${o.value===item.suggested?" ★":""}</option>`
+  ).join("");
+
+  const statusBadge = {
+    idle: "",
+    converting: `<span class="badge text-cyan flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse"></span>KONVERTIERT…</span>`,
+    done: `<span class="badge text-mint flex items-center gap-1.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>FERTIG</span>`,
+    error: `<span class="badge text-rose">FEHLER</span>`
+  }[item.status];
+
+  const progressHtml = item.status === "converting" ? `
+    <div class="mt-3">
+      <div class="flex items-center justify-between text-xs mb-1.5">
+        <span data-progress-text="${item.id}" class="text-mist">${item.progressText || "Bereite vor…"}</span>
+        <span data-progress-pct="${item.id}" class="text-cyan font-mono">${item.progress}%</span>
+      </div>
+      <div class="w-full bg-panel2 rounded-full h-1.5 overflow-hidden">
+        <div data-progress-bar="${item.id}" class="progress-fill arrow-flow pulsing h-1.5 rounded-full" style="width:${item.progress}%"></div>
+      </div>
+    </div>` : "";
+
+  const resultHtml = item.status === "done" ? `
+    <div class="mt-4 pt-4 border-t border-edge flex flex-col sm:flex-row sm:items-center gap-4 fade-in">
+      <div class="thumb-wrap shrink-0">${previewNode(item.resultURL, item.resultType, true)}</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-fog truncate">${escapeHtml(item.resultName)}</p>
+        <p class="text-xs text-mist mt-0.5">${formatSize(item.resultBlob.size)} ${sizeDelta(item)}</p>
+      </div>
+      <a href="${item.resultURL}" download="${escapeHtml(item.resultName)}" class="grad-chip font-medium text-sm px-5 py-2.5 rounded-lg text-center whitespace-nowrap">Herunterladen</a>
+    </div>` : "";
+
+  const errorHtml = item.status === "error" ? `
+    <div class="mt-3 text-sm text-rose bg-rose/10 border border-rose/25 rounded-lg px-3 py-2.5">${escapeHtml(item.errorMsg || "Unbekannter Fehler")}</div>` : "";
+
+  return `
+  <div class="glass rounded-xl p-4 sm:p-5 fade-in ${item.advancedOpen ? "advanced-open" : ""}" data-card="${item.id}">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="thumb-wrap shrink-0">${previewNode(item.previewURL, item.type, true)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <span class="w-5 h-5 rounded flex items-center justify-center shrink-0" style="background:${typeBg}">
+            <svg class="w-3 h-3 ${typeColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${typeIconPath(item.type)}"/></svg>
+          </span>
+          <p class="text-sm font-medium text-fog truncate">${escapeHtml(item.file.name)}</p>
+        </div>
+        <p class="badge text-mist">${formatSize(item.file.size)} &middot; ${item.ext.toUpperCase()}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div class="flex items-center gap-2 badge text-mist">
+          <span class="px-2 py-1 rounded bg-panel2 border border-edge">${item.ext.toUpperCase()}</span>
+          <svg class="w-3.5 h-3.5 text-mist" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          <select data-role="format" data-id="${item.id}" class="bg-panel2 border border-edge rounded px-2 py-1 text-fog" ${item.status==="converting"?"disabled":""}>${optionsHtml}</select>
+        </div>
+        <button data-role="advanced" data-id="${item.id}" class="p-2 rounded-lg border border-edge text-mist hover:text-fog hover:border-mist transition-colors" title="Erweiterte Optionen">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+        <button data-role="convert" data-id="${item.id}" class="grad-chip font-medium text-sm px-4 py-2 rounded-lg whitespace-nowrap" ${item.status==="converting"?"disabled":""}>${item.status==="converting"?"Läuft…":item.status==="done"?"Erneut":"Konvertieren"}</button>
+        <button data-role="remove" data-id="${item.id}" class="p-2 rounded-lg text-mist hover:text-rose transition-colors" title="Entfernen">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mt-2">
+      <button data-role="toggle-advanced-text" data-id="${item.id}" class="text-xs text-mist hover:text-fog flex items-center gap-1 transition-colors">
+        Erweitert <svg class="w-3 h-3 toggle-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      ${statusBadge}
+    </div>
+
+    <div class="mt-3 ${item.advancedOpen ? "" : "hidden"}" data-advanced-panel="${item.id}">
+      ${advancedPanel(item)}
+    </div>
+
+    ${progressHtml}
+    ${errorHtml}
+    ${resultHtml}
+  </div>`;
+}
+
+function sizeDelta(item) {
+  const before = item.file.size, after = item.resultBlob.size;
+  if (!before) return "";
+  const pct = Math.round((1 - after / before) * 100);
+  if (Math.abs(pct) < 2) return "";
+  return pct > 0
+    ? `<span class="text-mint">· ${pct}% kleiner</span>`
+    : `<span class="text-amber">· ${Math.abs(pct)}% größer</span>`;
+}
+
+function renderAll() {
+  fileListEl.innerHTML = items.map(renderCard).join("");
+  renderBatchBar();
+  attachCardListeners();
+}
+
+function attachCardListeners() {
+  fileListEl.querySelectorAll('[data-role="format"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).targetFormat = e.target.value;
+    renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="remove"]').forEach(el => el.addEventListener("click", e => {
+    const item = findItem(e.currentTarget.dataset.id);
+    if (item) { URL.revokeObjectURL(item.previewURL); if (item.resultURL) URL.revokeObjectURL(item.resultURL); }
+    items = items.filter(i => i.id !== e.currentTarget.dataset.id);
+    renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="convert"]').forEach(el => el.addEventListener("click", e => {
+    convertOne(findItem(e.currentTarget.dataset.id));
+  }));
+  fileListEl.querySelectorAll('[data-role="advanced"], [data-role="toggle-advanced-text"]').forEach(el => el.addEventListener("click", e => {
+    const item = findItem(e.currentTarget.dataset.id);
+    item.advancedOpen = !item.advancedOpen;
+    renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="quality"]').forEach(el => el.addEventListener("input", e => {
+    findItem(e.target.dataset.id).quality = Number(e.target.value);
+    renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="resolution"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).resolution = e.target.value; renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="bitrate"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).bitrate = e.target.value; renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="resize"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).resizeMax = e.target.value; renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="trimStart"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).trimStart = e.target.value; renderAll();
+  }));
+  fileListEl.querySelectorAll('[data-role="trimEnd"]').forEach(el => el.addEventListener("change", e => {
+    findItem(e.target.dataset.id).trimEnd = e.target.value; renderAll();
+  }));
+}
+
+function findItem(id) { return items.find(i => i.id === id); }
+
+function setProgress(item, pct, text) {
+  item.progress = pct; item.progressText = text;
+  const bar = fileListEl.querySelector(`[data-progress-bar="${item.id}"]`);
+  const pctEl = fileListEl.querySelector(`[data-progress-pct="${item.id}"]`);
+  const txtEl = fileListEl.querySelector(`[data-progress-text="${item.id}"]`);
+  if (bar) bar.style.width = pct + "%";
+  if (pctEl) pctEl.textContent = pct + "%";
+  if (txtEl) txtEl.textContent = text;
+}
+
+/* ---------- file handling ---------- */
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop", e => { e.preventDefault(); dropZone.classList.remove("dragover"); addFiles(e.dataTransfer.files); });
+fileInput.addEventListener("change", e => { addFiles(e.target.files); fileInput.value = ""; });
+
+function addFiles(fileListRaw) {
+  const newItems = Array.from(fileListRaw).map(makeItem).filter(Boolean);
+  if (!newItems.length && fileListRaw.length) { alert("Bitte wähle Audio-, Video- oder Bild-Dateien aus."); return; }
+  items = items.concat(newItems);
+  renderAll();
+}
+
+clearAllBtn.addEventListener("click", () => {
+  items.forEach(i => { URL.revokeObjectURL(i.previewURL); if (i.resultURL) URL.revokeObjectURL(i.resultURL); });
+  items = [];
+  renderAll();
+});
+
+convertAllBtn.addEventListener("click", async () => {
+  for (const item of items) {
+    if (item.status === "converting") continue;
+    await convertOne(item);
+  }
+});
+
+zipAllBtn.addEventListener("click", async () => {
+  const done = items.filter(i => i.status === "done");
+  if (!done.length) return;
+  zipAllBtn.disabled = true;
+  zipAllBtn.textContent = "Packe ZIP…";
+  try {
+    const zip = new JSZip();
+    done.forEach(i => zip.file(i.resultName, i.resultBlob));
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "convert-ergebnisse.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    alert("ZIP konnte nicht erstellt werden: " + (err.message || err));
+  } finally {
+    zipAllBtn.disabled = false;
+    zipAllBtn.textContent = "Als ZIP herunterladen";
+  }
+});
+
+/* ---------- ffmpeg ---------- */
+async function loadFFmpeg(onProgress) {
+  if (ffmpegLoaded && ffmpeg) return ffmpeg;
+  if (ffmpegLoading) return ffmpegLoading;
+  ffmpegLoading = (async () => {
+    onProgress?.(5, "Lade FFmpeg (einmalig ~31 MB)…");
+    ffmpeg = new FFmpeg();
+    ffmpeg.on("log", ({ message }) => console.log("[FFmpeg]", message));
+    const base = new URL("./", import.meta.url).href;
+    const coreURL = await toBlobURL("https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js", "text/javascript");
+    const wasmURL = await toBlobURL("https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm", "application/wasm");
+    await ffmpeg.load({ coreURL, wasmURL, workerURL: base + "worker.js" });
+    ffmpegLoaded = true;
+    return ffmpeg;
+  })();
+  return ffmpegLoading;
+}
+
+function buildFFmpegArgs(item, input, output, sizeMB) {
+  const format = item.targetFormat;
+  const isVideoOut = ["mp4","webm","avi","mov","mkv"].includes(format);
+  const args = [];
+
+  const startSec = parseTimeToSeconds(item.trimStart);
+  const endSec = parseTimeToSeconds(item.trimEnd);
+  if (startSec !== null) args.push("-ss", String(startSec));
+  args.push("-i", input);
+  if (startSec !== null && endSec !== null && endSec > startSec) {
+    args.push("-t", String(endSec - startSec));
+  } else if (startSec === null && endSec !== null) {
+    args.push("-t", String(endSec));
+  }
+
+  if (isVideoOut) {
+    const heights = { "1080":1080, "720":720, "480":480 };
+    const vf = item.resolution !== "original" && heights[item.resolution]
+      ? ["-vf", `scale=-2:${heights[item.resolution]}`] : [];
+    const crf = String(item.quality || 28);
+    if (format === "mp4" || format === "mov" || format === "mkv") {
+      args.push(...vf, "-c:v", "libx264", "-preset", "ultrafast", "-crf", crf, "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", output);
+    } else if (format === "webm") {
+      const vbit = sizeMB > 80 ? "500k" : "1M";
+      args.push(...vf, "-c:v", "libvpx", "-b:v", vbit, "-c:a", "libvorbis", "-y", output);
+    } else if (format === "avi") {
+      args.push(...vf, "-c:v", "mpeg4", "-q:v", "6", "-c:a", "libmp3lame", "-y", output);
+    } else {
+      args.push(...vf, "-y", output);
+    }
+    return args;
+  }
+
+  const bitrate = item.bitrate || "192k";
+  if (format === "mp3") args.push("-vn", "-acodec", "libmp3lame", "-b:a", bitrate, "-ar", "44100", "-ac", "2", "-y", output);
+  else if (format === "wav") args.push("-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-y", output);
+  else if (format === "ogg") args.push("-vn", "-acodec", "libvorbis", "-b:a", bitrate, "-y", output);
+  else if (format === "flac") args.push("-vn", "-acodec", "flac", "-y", output);
+  else if (format === "aac" || format === "m4a") args.push("-vn", "-acodec", "aac", "-b:a", bitrate, "-ar", "44100", "-ac", "2", "-y", output);
+  else args.push("-vn", "-y", output);
+  return args;
+}
+
+async function convertImage(item) {
+  const { file, targetFormat, quality, resizeMax } = item;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = item.previewURL;
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const maxW = resizeMax !== "original" ? Number(resizeMax) : null;
+      if (maxW && w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const mimeMap = { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", gif:"image/gif", bmp:"image/bmp" };
+      const mime = mimeMap[targetFormat] || "image/png";
+      const q = (targetFormat === "jpg" || targetFormat === "jpeg" || targetFormat === "webp") ? quality / 100 : undefined;
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Bild-Konvertierung fehlgeschlagen")), mime, q);
+    };
+    img.onerror = () => reject(new Error("Bild konnte nicht geladen werden"));
+    img.src = url;
+  });
+}
+
+async function convertOne(item) {
+  if (!item || item.status === "converting") return;
+  item.status = "converting"; item.errorMsg = null;
+  setProgress(item, 0, "Bereite vor…");
+  renderAll();
+
+  const file = item.file;
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 200 && item.type !== "image") {
+    const ok = confirm(`Die Datei ist ${sizeMB.toFixed(0)} MB groß.\n\nDas kann im Browser lange dauern oder viel Speicher brauchen.\n\nTrotzdem fortfahren?`);
+    if (!ok) { item.status = "idle"; renderAll(); return; }
+  }
+
+  try {
+    let blob, newName;
+    if (item.type === "image") {
+      setProgress(item, 40, "Bild wird konvertiert…");
+      renderAll();
+      blob = await convertImage(item);
+      newName = file.name.replace(/\.[^/.]+$/, "") + "." + item.targetFormat;
+      item.resultType = "image";
+    } else {
+      const local = await loadFFmpeg((p, t) => setProgress(item, p, t));
+      const progressHandler = ({ progress }) => {
+        const p = Math.min(95, Math.max(10, Math.round(progress * 100)));
+        setProgress(item, p, "Konvertiere…");
+      };
+      local.on("progress", progressHandler);
+
+      const inputName = "in_" + item.id + (item.ext ? "." + item.ext : "");
+      const outputName = "out_" + item.id + "." + item.targetFormat;
+      setProgress(item, 8, "Lese Datei (" + sizeMB.toFixed(1) + " MB)…");
+      renderAll();
+      await local.writeFile(inputName, await fetchFile(file));
+      setProgress(item, 15, sizeMB > 50 ? "Konvertiere große Datei – bitte warten…" : "Konvertiere…");
+      renderAll();
+
+      const args = buildFFmpegArgs(item, inputName, outputName, sizeMB);
+      try {
+        await local.exec(args);
+      } catch (e) {
+        if (item.targetFormat === "mp3") {
+          setProgress(item, 15, "Zweiter Versuch (einfacher)…");
+          await local.exec(["-i", inputName, "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-y", outputName]);
+        } else {
+          throw e;
+        }
+      }
+      local.off("progress", progressHandler);
+      setProgress(item, 96, "Lese Ergebnis…");
+      const data = await local.readFile(outputName);
+      blob = new Blob([data.buffer], { type: getMime(item.targetFormat) });
+      newName = file.name.replace(/\.[^/.]+$/, "") + "." + item.targetFormat;
+      item.resultType = item.type === "video" && ["mp3","wav"].includes(item.targetFormat) ? "audio" : item.type;
+      try { await local.deleteFile(inputName); await local.deleteFile(outputName); } catch (_) {}
+    }
+
+    item.resultBlob = blob;
+    item.resultURL = URL.createObjectURL(blob);
+    item.resultName = newName;
+    item.status = "done";
+    setProgress(item, 100, "Fertig");
+  } catch (err) {
+    console.error(err);
+    let msg = err?.message || String(err);
+    if (/memory|OOM|allocation/i.test(msg)) msg = "Zu wenig Speicher im Browser. Kleinere Datei versuchen oder Tab neu laden.";
+    item.status = "error";
+    item.errorMsg = msg;
+  }
+  renderAll();
+}
+</script>
+</body>
+</html>
